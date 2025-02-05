@@ -1,14 +1,24 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using MongoDB.Driver;
 using System.Text;
+using UserService.Services;
 using UserService.UserService.Data;
+using static Google.Protobuf.JsonParser;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddDbContext<UserDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
-);
+builder.Services.Configure<Settings>(builder.Configuration.GetSection("ConnectionStrings"));
+
+// Подключение к MongoDB
+var mongoConnectionString = builder.Configuration.GetConnectionString("MongoDB");
+builder.Services.AddSingleton<IMongoClient>(new MongoClient(mongoConnectionString));
+builder.Services.AddScoped<IMongoDatabase>(sp =>
+{
+    var client = sp.GetRequiredService<IMongoClient>();
+    return client.GetDatabase("woltfood");
+});
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -29,10 +39,18 @@ builder.Services.AddAuthentication(options =>
 
 // Добавляем контроллеры
 builder.Services.AddControllers();
-
+builder.Services.AddGrpc();
 var app = builder.Build();
 
-// Включаем аутентификацию и авторизацию
+
+
+
+
+app.MapGrpcService<UserGrpcService>();
+app.MapGet("/", () => "gRPC User Service is running");
+
+
+
 app.UseAuthentication();
 app.UseAuthorization();
 
